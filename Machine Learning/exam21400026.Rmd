@@ -1,0 +1,188 @@
+---
+title: "exam"
+output: word_document
+---
+
+
+```{r,echo = FALSE, warning=FALSE, message = FALSE}
+
+# library
+library(glmnet)
+library(lattice)
+library(earth)
+library(caret)
+library(ggplot2)
+library(plotly)
+library(e1071)
+library(gbm)
+library(rpart)
+library(rpart.plot)#affichage des arbres
+library(RColorBrewer)
+library(rattle)
+library(randomForest)
+
+```
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r, echo=FALSE}
+data = read.csv("C:/Users/DELL/Dropbox/semestre 9/Intro au ML2/Base/data_examen.csv", sep=";")
+data = as.data.frame(data)
+```
+
+# Question 1
+
+
+```{r, warning=FALSE}
+set.seed(42)
+pct_learning = 0.8
+
+
+v = c("L","T")
+s = sample(v,269,prob=c(pct_learning,1-pct_learning),replace=TRUE)
+data = cbind(data,s)
+
+train = subset(data, s == "L") #echantillon d'apprentissage
+test = subset(data, s == "T") #echantillon test
+
+train = train[,-23]
+test = test[,-23]
+```
+
+
+# Question 2
+
+```{r}
+c = 50
+
+train_noy = train[sample(1:nrow(train),c, replace = T),]
+train_noy = train_noy[,-22]
+```
+
+# Question 3
+
+le temps de calcul est de W
+```{r}
+p = 21
+gama = 1/p
+
+start_time = Sys.time()
+
+K = function(x1,x2){
+  return(exp(-gama*(sum((x1-x2))^2)))
+}
+W = matrix(0, 50,50)
+
+for (i in 1:50){
+  for (j in 1:50){
+    W[i,j] = K(train_noy[i,],train_noy[j,])
+  }
+}
+
+end_time = Sys.time()
+
+end_time - start_time
+```
+# question 4
+
+```{r}
+k=10
+Wk = W[,1:k]
+
+svd = svd(Wk)
+
+Uk = svd$u
+Vk = svd$v
+
+sigma = svd$d
+sigma = sigma^(-0.5)
+
+sigma = diag(sigma)
+
+Mk = Uk%*%sigma
+```
+
+# question 5
+
+```{r}
+X_train = train[,-22]
+n1 = nrow(X_train)
+C_train = matrix(0,n1,50)
+for (i in 1:n1){
+  for (j in 1:50){
+    C_train[i,j] = K(X_train[i,],train_noy[j,])
+  }
+}
+
+X_test = test[,-22]
+n2 = nrow(X_test)
+
+C_test = matrix(0,n2,50)
+for (i in 1:n2){
+  for (j in 1:50){
+    C_test[i,j] = K(X_test[i,],train_noy[j,])
+  }
+}
+
+
+Z_train = C_train%*%Mk
+Z_test = C_test%*%Mk
+```
+
+
+# question 6
+
+l'accuracy du modéle svm linéaire est:
+```{r,warning=FALSE}
+
+start_time = Sys.time()
+
+svmfit_lin =svm(Y~., data=train , kernel ="linear",
+                cost =0.1, scale =FALSE, type = "C-classification" )
+pred_svm_lin=predict(svmfit_lin ,test)
+mat_confusion_svm_lineaire=table(predict =pred_svm_lin , truth= test$Y)
+acc_svm_lineaire=sum(diag(mat_confusion_svm_lineaire))/sum(colSums(mat_confusion_svm_lineaire))
+
+
+acc_svm_lineaire
+
+end_time = Sys.time()
+```
+le temps de calcul  du svm linéaire:
+```{r}
+end_time - start_time
+```
+
+
+# question 7
+
+l'accuracy du modéle a noyau est de 
+```{r}
+
+start_time = Sys.time()
+y_train = train$Y[1:n1]
+y_test = test$Y[1:n2]
+
+Z_train = as.data.frame(cbind(Z_train,y_train))
+Z_test = as.data.frame(cbind(Z_test,y_test))
+
+
+svmfit_ker =svm(y_train~., data=Z_train , kernel ="linear", cost =0.01, scale =FALSE, type = "C-classification" )
+pred_svm_ker=predict(svmfit_ker ,Z_test)
+mat_confusion_svm_ker=table(predict =pred_svm_ker , truth= Z_test$y_test)
+acc_svm_ker=sum(diag(mat_confusion_svm_ker))/sum(colSums(mat_confusion_svm_ker))
+
+
+acc_svm_ker
+
+end_time = Sys.time()
+```
+Le temps de calcul du svm a noyau est :
+```{r}
+end_time - start_time
+```
+
